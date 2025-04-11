@@ -39,4 +39,17 @@ def compile_latex(tex_file: str):
     """
     Runs xelatex on the given .tex file in a subprocess.
     """
-    subprocess.run(["xelatex", "-output-directory=output", tex_file])
+    cmd = [
+        "xelatex",
+        "-interaction=batchmode",
+        "-halt-on-error",
+        "-output-directory=output",
+        tex_file
+    ]
+    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    if result.returncode != 0:
+        # If there is an error, print the captured output
+        print("LaTeX compilation failed:")
+        print(result.stdout)
+        print(result.stderr)
+        raise Exception("LaTeX compilation failed")
