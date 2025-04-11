@@ -1,0 +1,16 @@
+# Big Files
+*.txt
+*.pdf
+*.log
+*.aux
+*.tex
+
+# Python caches
+__pycache__/
+*.pyc
+
+# Other
+.DS_Store
+.vscode/
+.ipynb_checkpoints
+old/
