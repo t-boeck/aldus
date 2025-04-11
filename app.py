@@ -5,23 +5,23 @@ import uuid
 from contextlib import redirect_stdout
 
 from scripts.text_utils import split_paragraphs
-from scripts.translator import translate_paragraph
+from scripts.translator import translate_paragraph, translate_paragraphs
 from scripts.latex_utils import make_bilingual_latex, compile_latex
 
 app = Flask(__name__)
 
-def generate_translation(eng_paragraphs):
+def generate_translation(eng_paragraphs, model):
     yield "<html><head><meta charset='utf-8'><title>Translation Progress</title>"
     yield """<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-      body { background-color: #f8f9fa; font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; }
+      body { background-color: #f8f9fa; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; }
       .container { max-width: 800px; margin: 2% auto; background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,0.1); }
       pre { background: #eee; padding: 10px; border-radius: 4px; white-space: pre-wrap; word-wrap: break-word; }
     </style>"""
     yield "</head><body><div class='container'>"
     yield "<h1>Translation in Progress</h1>"
     
-    # Create output folder and generate unique filename for Chinese debug file.
+    # Prepare output folder and unique debug filename.
     output_folder = "output"
     os.makedirs(output_folder, exist_ok=True)
     chi_debug_filename = f"{uuid.uuid4()}_translated.txt"
@@ -31,8 +31,8 @@ def generate_translation(eng_paragraphs):
     for i, paragraph in enumerate(eng_paragraphs, start=1):
         yield f"<p><strong>Paragraph {i}:</strong></p>"
         yield f"<p><strong>Input:</strong><br><pre>{paragraph}</pre></p>"
-        yield f"<p>Translating paragraph <strong>{i}</strong>...</p>"
-        translation = translate_paragraph(paragraph)
+        yield f"<p>Translating paragraph <strong>{i}</strong> using model <code>{model}</code>...</p>"
+        translation = translate_paragraph(paragraph, model)
         chi_paragraphs.append(translation)
         yield f"<p><strong>Output:</strong><br><pre>{translation}</pre></p>"
         yield "<hr/>"
@@ -51,7 +51,7 @@ def generate_translation(eng_paragraphs):
         f.write(latex_code)
     yield f"<p>Bilingual LaTeX file generated: <code>{tex_filename}</code></p>"
     
-    # Compile PDF.
+    # Compile to PDF.
     compile_latex(tex_path)
     pdf_filename = "bilingual_moby_dick.pdf"
     yield f"<p>PDF compilation complete: <code>{pdf_filename}</code></p>"
@@ -77,7 +77,11 @@ def index():
         else:
             print("Processing full text.")
         
-        return Response(generate_translation(eng_paragraphs), mimetype='text/html')
+        # Get model selection from the form, default to "gpt-4o-mini"
+        model_selected = request.form.get("model", "gpt-4o-mini")
+        print(f"Using model: {model_selected}")
+        
+        return Response(generate_translation(eng_paragraphs, model_selected), mimetype='text/html')
     
     return render_template("index.html")
 

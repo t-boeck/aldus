@@ -2,13 +2,12 @@ import re
 from openai import OpenAI
 from scripts.text_utils import split_paragraphs
 
-# Configure your OpenAI client.
-# Ensure your API key is set (e.g., via OPENAI_API_KEY environment variable).
+# Configure your OpenAI client (ensure your API key is set via environment variable or otherwise)
 client = OpenAI()
 
-def translate_paragraph(paragraph: str) -> str:
+def translate_paragraph(paragraph: str, model: str = "gpt-4o-mini") -> str:
     """
-    Translate a single English paragraph into Chinese in a literary style.
+    Translate a single English paragraph into Chinese using the specified model.
     The prompt instructs the model to output ONLY the Chinese translation.
     """
     if not paragraph.strip():
@@ -23,30 +22,30 @@ def translate_paragraph(paragraph: str) -> str:
     )
 
     response = client.responses.create(
-        model="gpt-4o-mini",  # Replace with your chosen model
+        model=model,
         input=prompt
     )
     
     return response.output_text.strip()
 
-def translate_paragraphs(eng_paragraphs: list[str], debug_chi_path: str) -> list[str]:
+def translate_paragraphs(eng_paragraphs: list[str], debug_chi_path: str, model: str) -> list[str]:
     """
-    Translate a list of English paragraphs into Chinese.
-    Write each translated paragraph (with a blank line following) to debug_chi_path.
-    Print the paragraph number before processing each paragraph.
+    Translate a list of English paragraphs into Chinese using the specified model.
+    Writes each translated paragraph (with a blank line following) to debug_chi_path.
+    Prints the paragraph number along with the model being used.
     
     Returns a list of Chinese paragraphs.
     """
     chi_paragraphs = []
     with open(debug_chi_path, "w", encoding="utf-8") as out_f:
         for i, paragraph in enumerate(eng_paragraphs, start=1):
-            print(f"Translating paragraph {i}...")
-            chi_para = translate_paragraph(paragraph)
+            print(f"Translating paragraph {i} using model {model}...")
+            chi_para = translate_paragraph(paragraph, model)
             chi_paragraphs.append(chi_para)
             out_f.write(chi_para + "\n\n")
     return chi_paragraphs
 
 if __name__ == "__main__":
-    # Optional quick test:
     sample = "Call me Ishmael. Some years ago--never mind how long precisely..."
-    print(translate_paragraph(sample))
+    translation = translate_paragraph(sample)
+    print("Translation:", translation)
