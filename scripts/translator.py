@@ -23,7 +23,7 @@ def translate_paragraph(paragraph: str) -> str:
     )
 
     response = client.responses.create(
-        model="gpt-4o-mini",  # or another appropriate model
+        model="gpt-4o",  # or another appropriate model
         input=prompt
     )
     return response.output_text.strip()

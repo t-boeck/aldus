@@ -1,4 +1,5 @@
 import os
+import time
 import sys
 import subprocess
 from scripts.text_utils import split_paragraphs
