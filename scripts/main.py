@@ -6,6 +6,9 @@ from scripts.latex_utils import make_bilingual_latex, compile_latex
 from scripts.translator import translate_paragraphs
 
 def main():
+
+    start_time = time.time()
+
     # 1. Read the English text file from the data folder.
     eng_file = os.path.join("data", "moby_dick.txt")
     with open(eng_file, "r", encoding="utf-8") as f:
@@ -42,6 +45,10 @@ def main():
     # 8. Compile the LaTeX file to generate a PDF.
     compile_latex(tex_filename)
     print("PDF compilation complete. Check the output folder for bilingual_moby_dick.pdf.")
+
+    end_time = time.time()
+    total_runtime = end_time - start_time
+    print(f"Total runtime: {total_runtime:.2f} seconds")
 
 if __name__ == "__main__":
     main()
