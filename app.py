@@ -1,59 +1,70 @@
-from flask import Flask, render_template, request, send_file
+from flask import Flask, render_template, request
 import os
+import io
 import uuid
-import subprocess
+from contextlib import redirect_stdout
 
-# Import your existing code
-# from scripts.main import run_bilingual_generation
-# or from scripts.text_utils, scripts.latex_utils, etc.
-from scripts.text_utils import split_paragraphs, process_paragraph
-from scripts.latex_utils import make_bilingual_latex, compile_latex
+from scripts.text_utils import split_paragraphs
+from scripts.translator import translate_paragraphs
 
 app = Flask(__name__)
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
     if request.method == 'POST':
-        # 1) Grab the uploaded files from the form
-        eng_file = request.files['english_file']
-        chi_file = request.files['chinese_file']
+        # Expect one file input: the English text.
+        eng_file = request.files.get('english_file')
+        if not eng_file:
+            return "Please upload an English text file."
 
-        if not eng_file or not chi_file:
-            return "Please upload both English and Chinese text files"
-
-        # 2) Read them as strings
+        # Read and decode the uploaded file.
         eng_text = eng_file.read().decode('utf-8', errors='replace')
-        chi_text = chi_file.read().decode('utf-8', errors='replace')
-
-        # 3) Process text -> paragraphs
         eng_paragraphs = split_paragraphs(eng_text)
-        chi_paragraphs = split_paragraphs(chi_text)
+        
+        # Check for test mode via a checkbox named "test_mode".
+        test_mode = request.form.get("test_mode")
+        if test_mode == "on":
+            eng_paragraphs = eng_paragraphs[:15]
+            print("Test mode enabled: processing only first 15 paragraphs.")
+        
+        # Prepare the output folder.
+        output_folder = "output"
+        os.makedirs(output_folder, exist_ok=True)
+        
+        # Build a unique filename for the Chinese debug file.
+        chi_debug_path = os.path.join(output_folder, f"{uuid.uuid4()}_translated.txt")
+        
+        # Capture log messages during translation.
+        log_stream = io.StringIO()
+        with redirect_stdout(log_stream):
+            chi_paragraphs = translate_paragraphs(eng_paragraphs, chi_debug_path)
+        logs = log_stream.getvalue()
+        
+        # Combine all translated paragraphs.
+        chi_text = "\n\n".join(chi_paragraphs)
+        
+        # Build an HTML response that displays the translation and the logs.
+        html_response = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <title>Translation Result</title>
+        </head>
+        <body>
+            <h1>Translation Result</h1>
+            <h2>Chinese Translation</h2>
+            <pre style="border:1px solid #ddd; padding:10px;">{chi_text}</pre>
+            <h2>Translation Logs</h2>
+            <pre style="border:1px solid #ddd; padding:10px;">{logs}</pre>
+        </body>
+        </html>
+        """
+        return html_response
 
-        # 4) Convert to LaTeX
-        latex_code = make_bilingual_latex(eng_paragraphs, chi_paragraphs)
-
-        # 5) Write latex file to a temp location
-        tex_filename = f"{uuid.uuid4()}.tex"  # unique name
-        pdf_filename = tex_filename.replace(".tex", ".pdf")
-
-        # Save in some temp folder, e.g. "output" or "tmp"
-        tex_path = os.path.join("output", tex_filename)
-        with open(tex_path, "w", encoding="utf-8") as f:
-            f.write(latex_code)
-
-        # 6) Compile using xelatex
-        compile_latex(tex_path)  # your latex_utils function
-
-        # PDF should now exist at output/<uuid>.pdf
-        pdf_path = os.path.join("output", pdf_filename)
-
-        # 7) Send file back as download
-        return send_file(pdf_path, as_attachment=True, download_name="bilingual.pdf")
-
-    # If GET request: show upload form
+    # GET: Render the file-upload form.
     return render_template("index.html")
 
 if __name__ == '__main__':
-    # create output folder if doesn't exist
-    os.makedirs("output", exist_ok=True)
+    # Run the Flask app on port 5000; ensure host is 0.0.0.0 for external access if needed.
     app.run(debug=True, host="0.0.0.0", port=5000)
