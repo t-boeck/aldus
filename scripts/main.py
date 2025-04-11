@@ -1,30 +1,45 @@
+"""
+main.py
+
+Reads English text, uses translator.py to get Chinese paragraphs,
+generates a bilingual LaTeX file, compiles to PDF.
+"""
+
 import os
-from .text_utils import split_paragraphs
-from .latex_utils import make_bilingual_latex, compile_latex
+import subprocess
+from scripts.text_utils import split_paragraphs
+from scripts.latex_utils import make_bilingual_latex, compile_latex
+from scripts.translator import translate_paragraphs
 
 def main():
-    # 1. Read English text
-    with open("data/moby_dick.txt", "r", encoding="utf-8") as f:
+    # 1. Read the English text file
+    eng_file = "data/moby_dick.txt"
+    with open(eng_file, "r", encoding="utf-8") as f:
         eng_text = f.read()
 
-    # 2. (Optional) Either read Chinese text or translate from the English
-    with open("data/moby_dick_chinese.txt", "r", encoding="utf-8") as f:
-        chi_text = f.read()
-
-    # 3. Split into paragraphs
+    # 2. Split into paragraphs
     eng_paragraphs = split_paragraphs(eng_text)
-    chi_paragraphs = split_paragraphs(chi_text)
 
-    # 4. Build LaTeX code
+    # 3. Translate English paragraphs -> Chinese paragraphs
+    chi_file = "moby_dick_translated.txt"  # debug output
+    chi_paragraphs = translate_paragraphs(eng_paragraphs, debug_chi_path=chi_file)
+
+    print(f"Chinese paragraphs written to: {chi_file}")
+
+    # 4. Generate the bilingual LaTeX
     latex_code = make_bilingual_latex(eng_paragraphs, chi_paragraphs)
 
-    # 5. Save to output folder
-    output_tex = "output/bilingual_moby_dick.tex"
-    with open(output_tex, "w", encoding="utf-8") as f:
+    # 5. Write out the bilingual LaTeX file
+    tex_filename = "bilingual_moby_dick.tex"
+    with open(tex_filename, "w", encoding="utf-8") as f:
         f.write(latex_code)
 
-    # 6. Compile
-    compile_latex(output_tex)
+    print(f"Bilingual LaTeX file generated: {tex_filename}")
+
+    # 6. Compile to PDF (using xelatex)
+    compile_latex(tex_filename)
+
+    print("PDF compilation complete. Check bilingual_moby_dick.pdf.")
 
 if __name__ == "__main__":
     main()
