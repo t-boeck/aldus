@@ -1,9 +1,13 @@
 import re
+import os
 from openai import OpenAI
 from scripts.text_utils import split_paragraphs
 
 # Configure your OpenAI client (ensure your API key is set via environment variable or otherwise)
-client = OpenAI()
+api_key = os.getenv("DEEPSEEK_API_KEY")
+
+# client = OpenAI() #uses open ai env api key
+client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
 
 def translate_paragraph(paragraph: str, model: str = "gpt-4o-mini") -> str:
     """
@@ -14,19 +18,30 @@ def translate_paragraph(paragraph: str, model: str = "gpt-4o-mini") -> str:
         return ""
 
     prompt = (
-        "You are a highly professional literary translator. "
+        "You are a highly professional literary translator, tasked with translating this sample from Herman Melville's novel Moby Dick, published in 1851. "
         "Translate the following text from English to Chinese, preserving its style, tone, nuance, and voice. "
         "Return ONLY the Chinese translation with no additional commentary, greetings, or extraneous text. "
         "Do not include any extra phrases such as 'Sure!' or 'Here’s the translation:'.\n\n"
         f"\"\"\"{paragraph}\"\"\""
     )
 
-    response = client.responses.create(
-        model=model,
-        input=prompt
-    )
+    # response = client.responses.create(
+    #     model=model,
+    #     input=prompt
+    # )
     
-    return response.output_text.strip()
+    # return response.output_text.strip()
+
+    response = client.chat.completions.create(
+        model="deepseek-chat",
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant"},
+            {"role": "user", "content": f"{prompt}"},
+        ],
+        stream=False
+    )
+
+    return response.choices[0].message.content.strip()
 
 def translate_paragraphs(eng_paragraphs: list[str], debug_chi_path: str, model: str) -> list[str]:
     """
@@ -36,6 +51,7 @@ def translate_paragraphs(eng_paragraphs: list[str], debug_chi_path: str, model: 
     
     Returns a list of Chinese paragraphs.
     """
+
     chi_paragraphs = []
     with open(debug_chi_path, "w", encoding="utf-8") as out_f:
         for i, paragraph in enumerate(eng_paragraphs, start=1):
