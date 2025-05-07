@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Translation progress</title>
+  <link rel="icon" type="image/png" href="/static/favicon.png">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    /* let long CJK text wrap inside <pre> blocks */
+    pre {
+      white-space: pre-wrap;   /* respect original line-breaks ***and*** allow wrapping */
+      word-wrap: break-word;   /* old name, good fallback */
+      word-break: break-all;   /* wrap between any CJK characters */
+    }
+    </style>
+</head>
+<body class="p-4">
+  <h2 class="mb-3">Translation in progress…</h2>
+
+  <div id="msg"   class="mb-2 fw-semibold">Starting…</div>
+  <div id="times" class="mb-3 text-muted small"></div>
+
+  <pre id="src"  class="p-2 bg-light border"></pre>
+  <pre id="tgt"  class="p-2 bg-light border"></pre>
+
+<script>
+const jid = "{{ jid }}";
+
+function fmtSec(s){
+  return `${Math.floor(s/60)}m ${s%60}s`;
+}
+
+async function poll(){
+  const r  = await fetch(`/status/${jid}`);
+  const j  = await r.json();
+  if (j.status === "pending") {
+    setTimeout(poll, 10);
+    return;
+  }
+  if(j.status === "running"){
+    document.getElementById("msg").textContent = j.msg;
+
+    // show times
+    const elapsed = fmtSec(j.elapsed);
+    const eta     = j.eta !== null ? fmtSec(j.eta) : "–";
+    const started = new Date(j.start * 1000).toLocaleTimeString();
+    document.getElementById("times").textContent =
+        `Started: ${started} • Elapsed: ${elapsed} • ETA: ${eta}`;
+
+    // latest paragraph
+    if(j.latest_src){
+      document.getElementById("src").textContent = j.latest_src;
+      document.getElementById("tgt").textContent = j.latest_tgt;
+    }
+    setTimeout(poll, 3000);
+  }
+  else if(j.status === "done"){
+    document.body.innerHTML = `
+      <h2 class="mb-3">Finished!</h2>
+      <a class="btn btn-primary me-2"
+         href="/download/${j.files.chi}">Download Chinese&nbsp;.txt</a>
+      <a class="btn btn-secondary"
+         href="/download/${j.files.tex}">Download&nbsp;.tex</a>`;
+  }
+  else { document.getElementById("msg").textContent = "Error: " + j.msg }
+}
+poll();
+</script>
+</body>
+</html>

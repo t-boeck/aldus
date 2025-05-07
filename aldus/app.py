@@ -1,101 +1,102 @@
-from flask import Flask, render_template, request, Response, send_from_directory
-import os
-import io
-import uuid
-from contextlib import redirect_stdout
+from flask import (
+    Flask, render_template, request, redirect, url_for,
+    jsonify, send_from_directory, abort
+)
+import concurrent.futures as cf
+import uuid, time, os
+from pathlib import Path
 
-from scripts.text_utils import split_paragraphs
-from scripts.translator import translate_paragraph, translate_paragraphs
-from scripts.latex_utils import make_bilingual_latex, compile_latex
-
+# ────────────────────────── app setup ──────────────────────────
 app = Flask(__name__)
+OUT = Path(app.root_path) / "output"
+OUT.mkdir(exist_ok=True)
 
-def generate_translation(eng_paragraphs, model):
-    yield "<html><head><meta charset='utf-8'><title>Translation Progress</title>"
-    yield "<link rel='icon' type='image/png' href='/static/favicon.png'>"
-    yield """<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-      body { background-color: #f8f9fa; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; }
-      .container { max-width: 800px; margin: 2% auto; background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,0.1); }
-      pre { background: #eee; padding: 10px; border-radius: 4px; white-space: pre-wrap; word-wrap: break-word; }
-    </style>"""
-    yield "</head><body><div class='container'>"
-    yield "<h1>Translation in Progress</h1>"
-    
-    # Prepare output folder and unique debug filename.
-    OUTPUT_DIR = os.path.join(app.root_path, "output")  # <— absolute path
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
+executor = cf.ThreadPoolExecutor(max_workers=2)       # background pool
+jobs: dict[str, dict] = {}                            # in-memory job store
 
-    chi_debug_filename = "moby_dick_translated.txt"
-    chi_debug_path = os.path.join(OUTPUT_DIR, chi_debug_filename)
-    
-    chi_paragraphs = []
-    for i, paragraph in enumerate(eng_paragraphs, start=1):
-        yield f"<p><strong>Paragraph {i}:</strong></p>"
-        yield f"<p><strong>Input:</strong><br><pre>{paragraph}</pre></p>"
-        yield f"<p>Translating paragraph <strong>{i}</strong> using model <code>{model}</code>...</p>"
-        translation = translate_paragraph(paragraph, model)
-        chi_paragraphs.append(translation)
-        yield f"<p><strong>Output:</strong><br><pre>{translation}</pre></p>"
-        yield "<hr/>"
-    
-    # Write Chinese debug file.
-    with open(chi_debug_path, "w", encoding="utf-8") as f:
-        for para in chi_paragraphs:
-            f.write(para + "\n\n")
-    yield f"<p>Chinese debug file written: <code>{chi_debug_filename}</code></p>"
-    
-    # Generate bilingual LaTeX.
-    latex_code = make_bilingual_latex(eng_paragraphs, chi_paragraphs)
-    tex_filename = "bilingual_moby_dick.tex"
-    tex_path = os.path.join(OUTPUT_DIR, tex_filename)
-    with open(tex_path, "w", encoding="utf-8") as f:
-        f.write(latex_code)
-    yield f"<p>Bilingual LaTeX file generated: <code>{tex_filename}</code></p>"
-    
-    # Compile to PDF.
-    # compile_latex(tex_path)
-    # pdf_filename = "bilingual_moby_dick.pdf"
-    # yield f"<p>PDF compilation complete: <code>{pdf_filename}</code></p>"
-    
-    # Provide download links.
-    yield f'<p><a href="/download?file={chi_debug_filename}" class="btn btn-primary">Download Chinese Translation .txt</a></p>'
-    yield f'<p><a href="/download?file={tex_filename}" class="btn btn-primary">Download Uncompiled Latex</a></p>'
-    # yield f'<p><a href="/download?file={pdf_filename}" class="btn btn-primary">Download PDF</a></p>'
-    yield "</div></body></html>"
+# ─────────────────────── heavy-work function ───────────────────
+def run_translation(jid: str, eng_text: str, model: str, test: bool):
+    from scripts.text_utils  import split_paragraphs
+    from scripts.translator  import translate_paragraph
+    from scripts.latex_utils import make_bilingual_latex
 
-@app.route('/', methods=['GET', 'POST'])
-def index():
-    if request.method == 'POST':
-        eng_file = request.files.get('english_file')
-        if not eng_file:
-            return "Please upload an English text file."
-        eng_text = eng_file.read().decode('utf-8', errors='replace')
-        eng_paragraphs = split_paragraphs(eng_text)
-        
-        # Test mode: limit to first 5 paragraphs.
-        test_mode = request.form.get("test_mode")
-        if test_mode == "on":
-            eng_paragraphs = eng_paragraphs[:5]
-            print("Test mode enabled: processing only first 5 paragraphs.")
-        else:
-            print("Processing full text.")
-        
-        # Get model selection from the form, default to "gpt-4o-mini"
-        model_selected = request.form.get("model", "gpt-4o-mini")
-        print(f"Using model: {model_selected}")
-        
-        return Response(generate_translation(eng_paragraphs, model_selected), mimetype='text/html')
-    
+    start_ts = time.time()
+    eng_pars  = split_paragraphs(eng_text)
+    if test:
+        eng_pars = eng_pars[:5]
+
+    total     = len(eng_pars)
+    chi_pars  = []
+    jobs[jid] = {"status": "running", "start": start_ts, "total": total}
+
+    dbg_path  = OUT / f"{jid}_chi.txt"
+    tex_path  = OUT / f"{jid}.tex"
+
+    with dbg_path.open("w", encoding="utf-8") as dbg:
+        for i, p in enumerate(eng_pars, 1):
+            chi = translate_paragraph(p, model)
+            chi_pars.append(chi)
+            dbg.write(chi + "\n\n")
+
+            jobs[jid].update(
+                done=i,
+                msg=f"Paragraph {i}/{total}",
+                latest_src=p,
+                latest_tgt=chi,
+            )
+
+    tex_code = make_bilingual_latex(eng_pars, chi_pars)
+    tex_path.write_text(tex_code, encoding="utf-8")
+
+    jobs[jid] = {
+        "status": "done",
+        "start": start_ts,
+        "total": total,
+        "done": total,
+        "files": {"chi": dbg_path.name, "tex": tex_path.name},
+    }
+
+# ─────────────────────────── routes ────────────────────────────
+@app.get("/")
+def home():
     return render_template("index.html")
 
-@app.route('/download')
-def download():
-    filename = request.args.get("file")
-    OUTPUT_DIR = os.path.join(app.root_path, "output")
-    return send_from_directory(OUTPUT_DIR, filename, as_attachment=True)
+@app.post("/start")
+def start():
+    f = request.files.get("english_file")
+    if not f:
+        return "No file uploaded", 400
+    eng_text = f.read().decode("utf-8", errors="replace")
+    model    = request.form.get("model", "deepseek-chat")
+    test     = request.form.get("test_mode") == "yes"
 
-if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
-    debug = os.environ.get("FLASK_DEBUG", "1") == "1"
-    app.run(host="0.0.0.0", port=port, debug=debug)
+    jid = uuid.uuid4().hex
+    executor.submit(run_translation, jid, eng_text, model, test)
+    return redirect(url_for("progress", jid=jid))
+
+@app.get("/progress/<jid>")
+def progress(jid):
+    return render_template("progress.html", jid=jid)
+
+@app.get("/status/<jid>")
+def status(jid):
+    d = jobs.get(jid)
+    if not d:
+        # job entry not created yet → tell the client to keep polling
+        return jsonify({"status": "pending"}), 200
+
+    elapsed = int(time.time() - d["start"])
+    pct     = d.get("done", 0) / max(d.get("total", 1), 1e-9)
+    eta_sec = int(elapsed * (1 - pct) / pct) if pct else None
+
+    return jsonify({**d, "elapsed": elapsed, "eta": eta_sec})
+
+@app.get("/download/<path:fname>")
+def download(fname):
+    return send_from_directory(OUT, fname, as_attachment=True)
+
+# ────────────────────────── entrypoint ─────────────────────────
+if __name__ == "__main__":
+    port  = int(os.getenv("PORT", 5000))
+    debug = os.getenv("FLASK_DEBUG", "1") == "1"
+    app.run("0.0.0.0", port, debug)

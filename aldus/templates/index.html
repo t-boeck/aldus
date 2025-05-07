@@ -22,7 +22,7 @@
     <h1 class="mb-1"><strong>Aldus</strong></h1>
     <h4 class="mb-4 fw-normal">The Bilingual Book Maker</h4>
   
-    <form method="POST" enctype="multipart/form-data" class="text-start">
+    <form action="{{ url_for('start') }}" method="POST" enctype="multipart/form-data" class="text-start">
       <div class="mb-3">
         <label for="english_file" class="form-label">
           Upload English <code>.txt</code> File
@@ -41,9 +41,10 @@
       </div>
   
       <div class="form-check mb-3">
-        <input type="checkbox" class="form-check-input" id="test_mode" name="test_mode">
+        <input  class="form-check-input" type="checkbox"
+                id="test_mode" name="test_mode" value="yes">
         <label class="form-check-label" for="test_mode">
-          Test Mode (translate only first 5 paragraphs)
+           Test Mode (translate only first 5 paragraphs)
         </label>
       </div>
   
