@@ -17,13 +17,17 @@ def translate_paragraph(paragraph: str, model: str = "gpt-4o-mini") -> str:
     if not paragraph.strip():
         return ""
 
-    prompt = (
-        "You are a highly professional literary translator, tasked with translating this sample from Herman Melville's novel Moby Dick, published in 1851. "
-        "Translate the following text from English to Chinese, preserving its style, tone, nuance, and voice. "
-        "Return ONLY the Chinese translation with no additional commentary, greetings, or extraneous text. "
-        "Do not include any extra phrases such as 'Sure!' or 'Here’s the translation:'.\n\n"
-        f"\"\"\"{paragraph}\"\"\""
-    )
+    
+    system_prompt = """
+        You are a highly professional literary translator, tasked with translating provided text from Herman Melville's 
+        novel Moby Dick, published in 1851. Preserve the text's style, tone, nuance, and voice. Return ONLY the Chinese 
+        translation with no additional commentary, greetings or extraneous text."""
+
+    user_prompt = f"""
+        Please translate the following paragraph:
+        
+        {paragraph}
+    """
 
     # response = client.responses.create(
     #     model=model,
@@ -35,8 +39,8 @@ def translate_paragraph(paragraph: str, model: str = "gpt-4o-mini") -> str:
     response = client.chat.completions.create(
         model="deepseek-chat",
         messages=[
-            {"role": "system", "content": "You are a helpful assistant"},
-            {"role": "user", "content": f"{prompt}"},
+            {"role": "system", "content": f"{system_prompt}"},
+            {"role": "user", "content": f"{user_prompt}"},
         ],
         stream=False
     )
