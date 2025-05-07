@@ -44,7 +44,8 @@ def main():
     print(f"Bilingual LaTeX file generated: {tex_filename}")
 
     # 8. Compile the LaTeX file to generate a PDF.
-    compile_latex(tex_filename)
+    
+    #compile_latex(tex_filename)
     print("PDF compilation complete. Check the output folder for bilingual_moby_dick.pdf.")
 
     end_time = time.time()

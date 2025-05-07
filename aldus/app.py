@@ -22,10 +22,11 @@ def generate_translation(eng_paragraphs, model):
     yield "<h1>Translation in Progress</h1>"
     
     # Prepare output folder and unique debug filename.
-    output_folder = "output"
-    os.makedirs(output_folder, exist_ok=True)
-    chi_debug_filename = f"{uuid.uuid4()}_translated.txt"
-    chi_debug_path = os.path.join(output_folder, chi_debug_filename)
+    OUTPUT_DIR = os.path.join(app.root_path, "output")  # <— absolute path
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+    chi_debug_filename = "moby_dick_translated.txt"
+    chi_debug_path = os.path.join(OUTPUT_DIR, chi_debug_filename)
     
     chi_paragraphs = []
     for i, paragraph in enumerate(eng_paragraphs, start=1):
@@ -46,18 +47,20 @@ def generate_translation(eng_paragraphs, model):
     # Generate bilingual LaTeX.
     latex_code = make_bilingual_latex(eng_paragraphs, chi_paragraphs)
     tex_filename = "bilingual_moby_dick.tex"
-    tex_path = os.path.join(output_folder, tex_filename)
+    tex_path = os.path.join(OUTPUT_DIR, tex_filename)
     with open(tex_path, "w", encoding="utf-8") as f:
         f.write(latex_code)
     yield f"<p>Bilingual LaTeX file generated: <code>{tex_filename}</code></p>"
     
     # Compile to PDF.
-    compile_latex(tex_path)
-    pdf_filename = "bilingual_moby_dick.pdf"
-    yield f"<p>PDF compilation complete: <code>{pdf_filename}</code></p>"
+    # compile_latex(tex_path)
+    # pdf_filename = "bilingual_moby_dick.pdf"
+    # yield f"<p>PDF compilation complete: <code>{pdf_filename}</code></p>"
     
-    # Provide download link.
-    yield f'<p><a href="/download?file={pdf_filename}" class="btn btn-primary">Download PDF</a></p>'
+    # Provide download links.
+    yield f'<p><a href="/download?file={chi_debug_filename}" class="btn btn-primary">Download Chinese Translation .txt</a></p>'
+    yield f'<p><a href="/download?file={tex_filename}" class="btn btn-primary">Download Uncompiled Latex</a></p>'
+    # yield f'<p><a href="/download?file={pdf_filename}" class="btn btn-primary">Download PDF</a></p>'
     yield "</div></body></html>"
 
 @app.route('/', methods=['GET', 'POST'])
@@ -88,8 +91,8 @@ def index():
 @app.route('/download')
 def download():
     filename = request.args.get("file")
-    output_folder = "output"
-    return send_from_directory(output_folder, filename, as_attachment=True)
+    OUTPUT_DIR = os.path.join(app.root_path, "output")
+    return send_from_directory(OUTPUT_DIR, filename, as_attachment=True)
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
