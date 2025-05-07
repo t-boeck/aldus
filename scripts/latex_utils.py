@@ -4,7 +4,7 @@ from .text_utils import process_paragraph
 def make_bilingual_latex(eng_paragraphs, chi_paragraphs):
     lines = []
     # Preamble
-    lines.append(r"\documentclass[12pt]{article}")
+    lines.append(r"\documentclass[17pt]{extarticle}")
     lines.append(r"\usepackage[UTF8]{ctex}")
     lines.append(r"\usepackage[margin=0.5in]{geometry}")
     lines.append(r"\usepackage{paracol}")
