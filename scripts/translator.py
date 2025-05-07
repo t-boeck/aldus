@@ -4,7 +4,7 @@ from openai import OpenAI
 from scripts.text_utils import split_paragraphs
 
 # Configure your OpenAI client (ensure your API key is set via environment variable or otherwise)
-api_key = os.getenv("DEEPSEEK_API_KEY")
+api_key = "sk-0ffd5e488d9541b2b2023f937b7a6345" # os.getenv("DEEPSEEK_API_KEY")
 
 # client = OpenAI() #uses open ai env api key
 client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")

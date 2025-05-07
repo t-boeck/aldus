@@ -13,26 +13,41 @@
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1><strong>Bilingual Book Maker</strong></h1>
-    <form method="POST" enctype="multipart/form-data">
+  <div class="container text-center my-4">
+    <img src="{{ url_for('static', filename='aldus.png') }}" alt="Aldus logo" 
+         class="img-fluid mb-2" style="max-height:80px">
+  
+    <h1 class="mb-1"><strong>Aldus</strong></h1>
+    <h4 class="mb-4 fw-normal">The Bilingual Book Maker</h4>
+  
+    <form method="POST" enctype="multipart/form-data" class="text-start">
       <div class="mb-3">
-        <label for="english_file" class="form-label">Upload English Text File</label>
-        <input type="file" class="form-control" id="english_file" name="english_file" accept=".txt" required>
+        <label for="english_file" class="form-label">
+          Upload English <code>.txt</code> File
+        </label>
+        <input type="file" class="form-control" id="english_file"
+               name="english_file" accept=".txt" required>
       </div>
+  
       <div class="mb-3">
         <label for="model" class="form-label">Select Model</label>
         <select class="form-select" id="model" name="model">
-          <option value="gpt-4o-mini" selected>gpt-4o-mini</option>
+          <option value="deepseek-chat" selected>deepseek-chat</option>
+          <option value="gpt-4o-mini">gpt-4o-mini</option>
           <option value="gpt-4o">gpt-4o</option>
-          <option value="deepseek-chat">deepseek-chat</option>
         </select>
       </div>
+  
       <div class="form-check mb-3">
         <input type="checkbox" class="form-check-input" id="test_mode" name="test_mode">
-        <label class="form-check-label" for="test_mode">Test Mode (translate only first 5 paragraphs)</label>
+        <label class="form-check-label" for="test_mode">
+          Test Mode (translate only first 5 paragraphs)
+        </label>
       </div>
-      <button type="submit" class="btn btn-primary w-100">Translate to Chinese</button>
+  
+      <button type="submit" class="btn btn-primary w-100">
+        Translate to Chinese
+      </button>
     </form>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
