@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2 class="mb-4">Library</h2>
+<p class="text-muted">All generated files are stored here.</p>
+
+<div class="table-responsive">
+    <table class="table table-hover">
+        <thead class="table-light">
+            <tr>
+                <th>Filename</th>
+                <th>Type</th>
+                <th>Size</th>
+                <th>Date</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for file in files %}
+            <tr>
+                <td>{{ file.name }}</td>
+                <td>
+                    {% if file.name.endswith('.pdf') %}
+                    <span class="badge bg-success">PDF</span>
+                    {% elif file.name.endswith('.tex') %}
+                    <span class="badge bg-secondary">LaTeX</span>
+                    {% elif file.name.endswith('.txt') %}
+                    <span class="badge bg-info text-dark">Text</span>
+                    {% else %}
+                    <span class="badge bg-light text-dark">File</span>
+                    {% endif %}
+                </td>
+                <td>{{ file.size }}</td>
+                <td>{{ file.date }}</td>
+                <td>
+                    <a href="{{ url_for('download', fname=file.name) }}"
+                        class="btn btn-sm btn-outline-primary">Download</a>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="5" class="text-center text-muted">No files found.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

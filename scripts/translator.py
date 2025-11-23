@@ -4,12 +4,7 @@ from openai import OpenAI
 from scripts.text_utils import split_paragraphs
 
 # Configure your OpenAI client (ensure your API key is set via environment variable or otherwise)
-api_key = os.getenv("DEEPSEEK_API_KEY")
-
-# client = OpenAI() #uses open ai env api key
-client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
-
-def translate_paragraph(paragraph: str, model: str = "gpt-4o-mini") -> str:
+def translate_paragraph(paragraph: str, api_key: str, system_prompt: str, model: str = "gpt-4o-mini") -> str:
     """
     Translate a single English paragraph into Chinese using the specified model.
     The prompt instructs the model to output ONLY the Chinese translation.
@@ -17,11 +12,8 @@ def translate_paragraph(paragraph: str, model: str = "gpt-4o-mini") -> str:
     if not paragraph.strip():
         return ""
 
-    
-    system_prompt = """
-        You are a highly professional literary translator, tasked with translating provided text from Herman Melville's 
-        novel Moby Dick, published in 1851. Preserve the text's style, tone, nuance, and voice. Return ONLY the Chinese 
-        translation with no additional commentary, greetings or extraneous text."""
+    # client = OpenAI() #uses open ai env api key
+    client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
 
     user_prompt = f"""
         Please translate the following paragraph:

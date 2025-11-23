@@ -1,16 +1,50 @@
+import os
 import subprocess
 from .text_utils import process_paragraph
 
-def make_bilingual_latex(eng_paragraphs, chi_paragraphs):
+def make_bilingual_latex(src_paragraphs, tgt_paragraphs, source_lang="english", target_lang="chinese", font_size=17):
     lines = []
     # Preamble
-    lines.append(r"\documentclass[17pt]{extarticle}")
-    lines.append(r"\usepackage[UTF8]{ctex}")
+    lines.append(f"\\documentclass[{font_size}pt]{{extarticle}}")
+    
+    # Load necessary language packages
+    langs = {source_lang.lower(), target_lang.lower()}
+    
+    if "chinese" in langs:
+        lines.append(r"\usepackage[UTF8]{ctex}")
+    
+    # Load babel for other languages if needed
+    babel_langs = []
+    if "spanish" in langs:
+        babel_langs.append("spanish")
+    if "french" in langs:
+        babel_langs.append("french")
+    
+    if babel_langs:
+        lines.append(f"\\usepackage[{','.join(babel_langs)}]{{babel}}")
+        
     lines.append(r"\usepackage[margin=0.5in]{geometry}")
     lines.append(r"\usepackage{paracol}")
     lines.append(r"\usepackage{setspace}")
     lines.append("")
-    lines.append(r"\columnratio{0.6}")
+    
+    # Determine column ratio
+    # Chinese is compact. 
+    # If Left (Source) is Spacious (Non-Chinese) and Right (Target) is Compact (Chinese) -> 0.6
+    # If Left (Source) is Compact (Chinese) and Right (Target) is Spacious (Non-Chinese) -> 0.4
+    # Otherwise -> 0.5
+    
+    is_src_compact = (source_lang.lower() == "chinese")
+    is_tgt_compact = (target_lang.lower() == "chinese")
+    
+    if not is_src_compact and is_tgt_compact:
+        ratio = 0.6
+    elif is_src_compact and not is_tgt_compact:
+        ratio = 0.4
+    else:
+        ratio = 0.5
+        
+    lines.append(f"\\columnratio{{{ratio}}}")
     lines.append(r"\setlength{\parindent}{0pt}")
     lines.append(r"\setlength{\parskip}{1em}")
     lines.append(r"\begin{document}")
@@ -19,15 +53,17 @@ def make_bilingual_latex(eng_paragraphs, chi_paragraphs):
     lines.append("")
 
     # Body
-    length = min(len(eng_paragraphs), len(chi_paragraphs))
+    length = min(len(src_paragraphs), len(tgt_paragraphs))
     for i in range(length):
-        epara = eng_paragraphs[i]
-        cpara = chi_paragraphs[i]
-        e_latex = process_paragraph(epara, line_stretch=1.3)
-        c_latex = process_paragraph(cpara, line_stretch=1.0)
-        lines.append(e_latex)
+        spara = src_paragraphs[i]
+        tpara = tgt_paragraphs[i]
+        
+        s_latex = process_paragraph(spara, language=source_lang, line_stretch=1.3)
+        t_latex = process_paragraph(tpara, language=target_lang, line_stretch=1.3 if not is_tgt_compact else 1.0)
+        
+        lines.append(s_latex)
         lines.append(r"\switchcolumn")
-        lines.append(c_latex)
+        lines.append(t_latex)
         lines.append(r"\switchcolumn*")
         lines.append("")
 
@@ -39,11 +75,12 @@ def compile_latex(tex_file: str):
     """
     Runs xelatex on the given .tex file in a subprocess.
     """
+    output_dir = os.path.dirname(tex_file)
     cmd = [
         "xelatex",
-        "-interaction=batchmode",
+        "-interaction=nonstopmode",
         "-halt-on-error",
-        "-output-directory=output",
+        f"-output-directory={output_dir}",
         tex_file
     ]
     result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
@@ -52,4 +89,5 @@ def compile_latex(tex_file: str):
         print("LaTeX compilation failed:")
         print(result.stdout)
         print(result.stderr)
-        raise Exception("LaTeX compilation failed")
+        # Raise exception with the last 500 chars of stdout to help debug
+        raise Exception(f"LaTeX compilation failed. Log: {result.stdout[-500:]}")

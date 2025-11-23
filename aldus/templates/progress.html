@@ -1,70 +1,135 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>Translation progress</title>
-  <link rel="icon" type="image/png" href="/static/favicon.png">
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <style>
-    /* let long CJK text wrap inside <pre> blocks */
-    pre {
-      white-space: pre-wrap;   /* respect original line-breaks ***and*** allow wrapping */
-      word-wrap: break-word;   /* old name, good fallback */
-      word-break: break-all;   /* wrap between any CJK characters */
-    }
-    </style>
-</head>
-<body class="p-4">
-  <h2 class="mb-3">Translation in progress…</h2>
+{% extends "base.html" %}
 
-  <div id="msg"   class="mb-2 fw-semibold">Starting…</div>
-  <div id="times" class="mb-3 text-muted small"></div>
+{% block content %}
+<div class="text-center">
+  <h2 class="mb-4">Translation in Progress</h2>
+  <p class="text-muted">Job ID: {{ jid }}</p>
 
-  <pre id="src"  class="p-2 bg-light border"></pre>
-  <pre id="tgt"  class="p-2 bg-light border"></pre>
+  <div class="card shadow-sm p-4 mb-4">
+    <div id="status-box">
+      <div class="spinner-border text-primary mb-3" role="status">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+      <h5 id="msg" class="mb-2">Initializing...</h5>
+      <p id="times" class="text-muted small"></p>
+    </div>
 
+    <div id="latest-preview" class="mt-4 text-start border-top pt-3" style="display:none;">
+      <h6>Latest Translation:</h6>
+      <div class="row">
+        <div class="col-md-6 border-end">
+          <small class="text-muted">Source:</small>
+          <p id="preview-src" class="fst-italic"></p>
+        </div>
+        <div class="col-md-6">
+          <small class="text-muted">Target:</small>
+          <p id="preview-tgt"></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="actions">
+    <button id="stopBtn" class="btn btn-danger" onclick="stopJob()">Stop Translating</button>
+    <a href="/" class="btn btn-secondary">Back to Home</a>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
 <script>
-const jid = "{{ jid }}";
+  const jid = "{{ jid }}";
+  let pollInterval = null;
 
-function fmtSec(s){
-  return `${Math.floor(s/60)}m ${s%60}s`;
-}
-
-async function poll(){
-  const r  = await fetch(`/status/${jid}`);
-  const j  = await r.json();
-  if (j.status === "pending") {
-    setTimeout(poll, 10);
-    return;
+  function fmtSec(s) {
+    if (s == null) return "--";
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return `${m}m ${sec}s`;
   }
-  if(j.status === "running"){
-    document.getElementById("msg").textContent = j.msg;
 
-    // show times
-    const elapsed = fmtSec(j.elapsed);
-    const eta     = j.eta !== null ? fmtSec(j.eta) : "–";
-    const started = new Date(j.start * 1000).toLocaleTimeString();
-    document.getElementById("times").textContent =
-        `Started: ${started} • Elapsed: ${elapsed} • ETA: ${eta}`;
+  function stopJob() {
+    if (!confirm("Are you sure you want to stop?")) return;
+    fetch(`/stop/${jid}`, { method: "POST" })
+      .then(r => r.json())
+      .then(d => {
+        const btn = document.getElementById("stopBtn");
+        btn.disabled = true;
+        btn.textContent = "Stopping...";
+      });
+  }
 
-    // latest paragraph
-    if(j.latest_src){
-      document.getElementById("src").textContent = j.latest_src;
-      document.getElementById("tgt").textContent = j.latest_tgt;
-    }
-    setTimeout(poll, 3000);
+  function checkStatus() {
+    fetch(`/status/${jid}`)
+      .then(r => r.json())
+      .then(j => {
+        if (j.status === "pending") return;
+
+        if (j.status === "running") {
+          let pct = Math.round((j.done / j.total) * 100);
+          if (isNaN(pct)) pct = 0;
+          document.getElementById("msg").textContent = `${j.msg} (${pct}%)`;
+
+          // show times
+          const elapsed = fmtSec(j.elapsed);
+          const eta = fmtSec(j.eta);
+          document.getElementById("times").textContent = `Elapsed: ${elapsed} | ETA: ${eta}`;
+
+          // preview
+          if (j.latest_src) {
+            document.getElementById("latest-preview").style.display = "block";
+            document.getElementById("preview-src").textContent = j.latest_src.substring(0, 150) + "...";
+            document.getElementById("preview-tgt").textContent = j.latest_tgt.substring(0, 150) + "...";
+          }
+
+        } else if (j.status === "done") {
+          clearInterval(pollInterval);
+          document.getElementById("stopBtn").style.display = "none";
+
+          const elapsed = fmtSec(j.elapsed);
+          document.getElementById("msg").className = "mb-2 fw-bold text-success";
+          document.getElementById("msg").textContent = "Translation Complete!";
+          document.getElementById("times").textContent = `Total Time: ${elapsed}`;
+
+          // Show download buttons
+          let html = "";
+          if (j.compile_error) {
+            html += `<div class="alert alert-warning">PDF Generation Failed: ${j.compile_error}</div>`;
+          } else if (j.files.pdf) {
+            html += `<a class="btn btn-success btn-lg mb-3 d-block" href="/download/${j.files.pdf}">Download PDF</a>`;
+          }
+
+          html += `
+          <div class="d-flex justify-content-center gap-2">
+              <a class="btn btn-outline-primary btn-sm" href="/download/${j.files.chi}">Download Translated .txt</a>
+              <a class="btn btn-outline-secondary btn-sm" href="/download/${j.files.tex}">Download .tex</a>
+          </div>
+          `;
+          document.getElementById("status-box").insertAdjacentHTML('beforeend', html);
+          document.querySelector(".spinner-border").style.display = "none";
+
+        } else if (j.status === "cancelled") {
+          clearInterval(pollInterval);
+          document.querySelector(".spinner-border").style.display = "none";
+          document.getElementById("stopBtn").style.display = "none";
+          document.getElementById("msg").className = "mb-2 fw-bold text-warning";
+          document.getElementById("msg").textContent = "Translation Cancelled";
+
+          if (j.files && j.files.chi && !document.getElementById("partial-btn")) {
+            const btn = `<div id="partial-btn" class="mt-3"><a class="btn btn-outline-primary" href="/download/${j.files.chi}">Download Partial Translation</a></div>`;
+            document.getElementById("times").insertAdjacentHTML('afterend', btn);
+          }
+        } else if (j.status === "error") {
+          document.getElementById("stopBtn").style.display = "none";
+          document.getElementById("msg").className = "mb-2 fw-bold text-danger";
+          document.getElementById("msg").textContent = "Error: " + j.msg;
+          document.querySelector(".spinner-border").style.display = "none";
+        }
+      })
+      .catch(err => console.error(err));
   }
-  else if(j.status === "done"){
-    document.body.innerHTML = `
-      <h2 class="mb-3">Finished!</h2>
-      <a class="btn btn-primary me-2"
-         href="/download/${j.files.chi}">Download Chinese&nbsp;.txt</a>
-      <a class="btn btn-secondary"
-         href="/download/${j.files.tex}">Download&nbsp;.tex</a>`;
-  }
-  else { document.getElementById("msg").textContent = "Error: " + j.msg }
-}
-poll();
+
+  pollInterval = setInterval(checkStatus, 2000);
+  checkStatus();
 </script>
-</body>
-</html>
+{% endblock %}
