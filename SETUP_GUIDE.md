@@ -49,9 +49,8 @@ Now we will download the Aldus code to your computer.
     ```
 3.  "Clone" (download) the repository:
     ```bash
-    git clone https://github.com/YOUR_USERNAME/aldus.git
+    git clone https://github.com/t-boeck/aldus.git
     ```
-    *(Note: Replace `YOUR_USERNAME` with the actual username if you haven't already)*
 4.  Go into the new folder:
     ```bash
     cd aldus
